@@ -17,6 +17,24 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token;
+  console.log("token insode", token);
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+
+  //verify token
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
+
 // const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.swu9d.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cwzf5.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -55,7 +73,8 @@ async function run() {
     });
 
     app.post("/logout", (req, res) => {
-      res.clearCookie("token", {
+      res
+        .clearCookie("token", {
           httpOnly: true,
           secure: false,
         })
@@ -89,9 +108,16 @@ async function run() {
 
     // job application apis
     // get all data, get one data, get some data [o, 1, many]
-    app.get("/job-application", async (req, res) => {
+    app.get("/job-application", verifyToken, async (req, res) => {
       const email = req.query.email;
       const query = { applicant_email: email };
+
+      // console.log(req.cookies?.token);
+
+      if (req.user.email !== req.query.email) {
+        return res.status(403).send({message:'forbidden'})
+      }
+
       const result = await jobApplicationCollection.find(query).toArray();
 
       // fokira way to aggregate data
